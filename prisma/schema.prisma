@@ -1,0 +1,202 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SELLER
+  BUYER
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  SOLD
+}
+
+enum InquiryStatus {
+  OPEN
+  CLOSED
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  COMPLETED
+}
+
+enum VerificationType {
+  SELLER
+  BUYER
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SupportStatus {
+  OPEN
+  RESOLVED
+}
+
+// NextAuth required models (Prisma Adapter)
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          Role      @default(BUYER)
+
+  accounts Account[]
+  sessions Session[]
+
+  listings             Listing[]
+  inquiries            Inquiry[]
+  offers               Offer[]
+  verificationRequests VerificationRequest[]
+  supportTickets       SupportTicket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Marketplace models
+model Listing {
+  id            String        @id @default(cuid())
+  sellerId      String
+  seller        User          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  status        ListingStatus @default(DRAFT)
+  title         String
+  description   String
+  techStack     String?
+  monthlyRevenue Int?
+  monthlyCosts   Int?
+  askingPrice    Int?
+  customers      Int?
+  churnPercent   Float?
+
+  inquiries Inquiry[]
+  offers   Offer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sellerId])
+  @@index([status])
+}
+
+model Inquiry {
+  id        String        @id @default(cuid())
+  listingId String
+  buyerId   String
+  message   String
+  status    InquiryStatus @default(OPEN)
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer   User    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
+  @@index([buyerId])
+}
+
+model Offer {
+  id        String      @id @default(cuid())
+  listingId String
+  buyerId   String
+  amount    Int
+  message   String?
+  status    OfferStatus @default(PENDING)
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer   User    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([listingId])
+  @@index([buyerId])
+  @@index([status])
+}
+
+model VerificationRequest {
+  id        String             @id @default(cuid())
+  userId    String
+  type      VerificationType
+  details   String
+  status    VerificationStatus @default(PENDING)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model SupportTicket {
+  id      String        @id @default(cuid())
+  userId  String?
+  email   String
+  subject String
+  message String
+  status  SupportStatus @default(OPEN)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
